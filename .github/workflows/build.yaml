@@ -196,7 +196,7 @@ jobs:
 #              iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
 #            }
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4 # Also updated checkout to latest stable
 
     - name: '🚧 Mount binfmt_misc'
       shell: bash
@@ -220,48 +220,6 @@ jobs:
         mkdir mnt
         debootstrap --foreign --arch=${{ matrix.config.arch }} --include=locales ${{ matrix.config.suite }} mnt/ ${{ matrix.config.pool }}
 
-    # https://wiki.debian.org/LoongArch/sbuildQEMU
-    # https://docs.loongnix.cn/loongnix/faq/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/%E6%A1%8C%E9%9D%A2%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F.html
-    - name: '🚧 Install Loong ArchLiunux firstly'
-      if: ${{ contains(matrix.config.arch, 'loong64') }}
-      shell: bash
-      run: |
-        mkdir arch
-        cd arch
-        echo "https://mirrors.nju.edu.cn/loongarch/archlinux/iso/latest/archlinux-bootstrap-loong64.tar.gz	\
-        https://mirrors.pku.edu.cn/loongarch/archlinux/iso/latest/archlinux-bootstrap-loong64.tar.gz	\
-        https://mirrors.wsyu.edu.cn/loongarch/archlinux/iso/latest/archlinux-bootstrap-loong64.tar.gz	\
-        https://mirror.iscas.ac.cn/loongarch/archlinux/iso/latest/archlinux-bootstrap-loong64.tar.gz" | aria2c --lowest-speed-limit=1M -s14 -x14 -k2M -j 4 --continue=true -i -
-        tar xf archlinux-bootstrap-loong64.tar.gz
-        mkdir -p root.loong64/target
-        # echo "Server = https://mirrors.nju.edu.cn/loongarch/archlinux/$repo/os/$arch" > root.loong64/etc/pacman.d/mirrorlist 
-        echo "nameserver 8.8.8.8" >> root.loong64/etc/resolv.conf # Configure DNS manually
-        mount --bind /proc root.loong64/proc
-        mount --bind /dev root.loong64/dev
-        chroot root.loong64/ pacman-key --init
-        chroot root.loong64/ pacman-key --populate
-        # chroot root.loong64/ pacman-key --refresh-keys # Slow and seems not necessary
-        sed -i -e "s/CheckSpace/#CheckSpace/g" root.loong64/etc/pacman.conf
-        chroot root.loong64/ pacman -Syu --noconfirm archlinux-keyring
-        for i in 1 2 3 4 5; do bash -c "chroot root.loong64/ pacstrap /target base base-devel linux linux-firmware networkmanager grub efibootmgr" && break; done
-        umount --recursive --force root.loong64/dev || true # It's okay they failed
-        umount --recursive --force root.loong64/proc || true
-
-    
-    - name: '🚧 Deboostrap 1st stage (loong64)'
-      if: ${{ contains(matrix.config.arch, 'loong64') }}
-      shell: bash
-      run: |
-        mkdir mnt/
-        debootstrap --foreign --arch=${{ matrix.config.arch }} \
-                         --variant=buildd --include=locales \
-                         --include=debian-ports-archive-keyring \
-                         --components=main \
-                         --keyring=/etc/apt/trusted.gpg.d/debian-ports-archive-2023.gpg \
-                         --extra-suites=unreleased \
-                         ${{ matrix.config.suite }} mnt/ ${{ matrix.config.pool }}
-    
-
     - name: '🚧 Deboostrap 2nd stage'
       shell: bash
       run: |
@@ -281,39 +239,6 @@ jobs:
       run: |
         chroot mnt/ apt install openssh-server -y
 
-    - name: '🚧 Configure Loongarch ArchLinux'
-      if: ${{ contains(matrix.config.arch, 'loong64') }}
-      shell: bash
-      run: |
-        cd arch/root.loong64/
-        mount --bind /proc target/proc
-        mount --bind /dev target/dev
-      
-        echo "nameserver 8.8.8.8" >> target/etc/resolv.conf
-        echo ${{ matrix.config.hostname }} > target/etc/hostname
-      
-        chroot target/ pacman-key --init
-        chroot target/ pacman-key --populate
-        sed -i -e "s/CheckSpace/#CheckSpace/g" target/etc/pacman.conf
-        chroot target/ pacman -Syu --noconfirm openssh
-    
-        chroot target/ systemctl enable sshd
-        chroot target/ systemctl enable NetworkManager
-  
-        chroot target/ useradd -m -G wheel -s /bin/bash debian
-        chroot target/ bash -c 'echo "debian:debian" | chpasswd'
-        chroot target/ bash -c 'echo "root:root" | chpasswd'
-        
-        umount --recursive --force target/dev || true # It's okay they failed
-        umount --recursive --force target/proc || true
-  
-        cd ../../
-        mv mnt debian
-        mv arch/root.loong64/target mnt
-        mv debian mnt/
-        
-        echo "nameserver 8.8.8.8" >> mnt/debian/etc/resolv.conf
-
     - name: '🚧 Configure Debian'
       if: ${{ !contains(matrix.config.arch, 'loong64') }}
       shell: bash
@@ -322,11 +247,8 @@ jobs:
         bash -c "echo >> mnt/etc/network/interfaces"
         bash -c "echo 'auto ${{ matrix.config.iface }}' >> mnt/etc/network/interfaces"
         bash -c "echo 'iface ${{ matrix.config.iface }} inet dhcp' >> mnt/etc/network/interfaces"
-
         bash -c "cat /dev/null > mnt/etc/machine-id"
         bash -c "echo ${{ matrix.config.hostname }} > mnt/etc/hostname"
-
-        # sudo chroot mnt bash -c 'echo "debian:debian" | chpasswd'
         chroot mnt bash -c "adduser --disabled-password --gecos '' debian"
         chroot mnt bash -c 'echo "root:root" | chpasswd'
         chroot mnt bash -c 'echo "debian:debian" | chpasswd'
@@ -339,19 +261,6 @@ jobs:
         qemu-img convert -c -f raw -O qcow2 raw.img artifact/${{ matrix.config.qcow2 }}
 
     - name: '📦 Pack Initrd & Kernel'
-      if: ${{ contains(matrix.config.arch, 'loong64') }}
-      shell: bash
-      run: |
-        find mnt/boot -name "vmlinu*" -exec mv {} ./artifact/vmlinuz-loong64 ';'
-        find mnt/boot -name "initram*" -exec mv {} ./artifact/initrd.img-loong64 ';'
-        cd artifact
-        echo "https://mirrors.nju.edu.cn/loongarch/archlinux/images/QEMU_EFI_8.1.fd	\
-        https://mirrors.pku.edu.cnloongarch/archlinux/images/QEMU_EFI_8.1.fd	\
-        https://mirrors.wsyu.edu.cn/loongarch/archlinux/images/QEMU_EFI_8.1.fd	\
-        https://mirror.iscas.ac.cn/loongarch/archlinux/images/QEMU_EFI_8.1.fd" | aria2c --lowest-speed-limit=200K -s14 -x14 -k1M -j 4 --continue=true -i -
-        mv QEMU_EFI_8.1.fd bios-loong64-8.1.bin
-
-    - name: '📦 Pack Initrd & Kernel'
       if: ${{ !contains(matrix.config.arch, 'loong64') }}
       shell: bash
       run: |
@@ -361,24 +270,23 @@ jobs:
     - name: '📦 Pack Rootfs'
       shell: bash
       run: |
-        ls -la .
-        ls -la artifact/
         tar caf artifact/${{ matrix.config.rootfs }} --one-file-system mnt
 
     - name: '📤 Upload artifact'
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         path: ./artifact/
-        name: artifact
+        name: artifact-${{ matrix.config.arch }} # v4 requires unique names for parallel jobs
 
   publish:
     needs: [Build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
-          name: artifact
+          pattern: artifact-* # v4 allows downloading multiple artifacts via patterns
           path: artifact
+          merge-multiple: true
 
       - name: '📦 Check artifacts'
         shell: bash
@@ -387,7 +295,7 @@ jobs:
       
       - name: '📦 Release'
         if: startsWith(github.ref, 'refs/tags')
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2 # Also updated to latest
         with:
           token: ${{ secrets.RELEASE_TOKEN }}
           files: ./artifact/*
