@@ -229,6 +229,8 @@ jobs:
       if: ${{ !contains(matrix.config.arch, 'loong64') }}
       shell: bash
       run: |
+        bash -c "echo 'fake /usr ext4 fake 0 1' > mnt/etc/fstab"
+        chroot mnt/ apt update && chroot mnt/ apt install initramfs-tools -y
         sed -i 's/MODULES=most/MODULES=list/' mnt/etc/initramfs-tools/initramfs.conf
         
         {
@@ -257,7 +259,6 @@ jobs:
           echo "cdc_ether"
         } >> mnt/etc/initramfs-tools/modules      
         
-        bash -c "echo 'fake /usr ext4 fake 0 1' > mnt/etc/fstab"
         chroot mnt/ apt update && chroot mnt/ apt install ${{ matrix.config.kernel }} -y
         bash -c "echo '/dev/vda / ext4 errors=remount-ro 0 1' > mnt/etc/fstab"
     
