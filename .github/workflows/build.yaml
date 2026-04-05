@@ -229,9 +229,37 @@ jobs:
       if: ${{ !contains(matrix.config.arch, 'loong64') }}
       shell: bash
       run: |
+        sed -i 's/MODULES=most/MODULES=list/' mnt/etc/initramfs-tools/initramfs.conf
+        
+        {
+          # Core VirtIO & Filesystem
+          echo "virtio_mmio"
+          echo "virtio_blk"
+          echo "virtio_net"
+          echo "virtio_pci"
+          echo "ext4"
+          echo "sd_mod"
+
+          # USB Core & Controllers
+          echo "xhci-pci"
+          echo "uhci-hcd"
+          echo "ehci-pci"
+          
+          # USB Device Classes
+          echo "usb-storage"
+          echo "uas"
+          echo "usbhid"
+          echo "usbnet"
+          
+          # Common USB Networking
+          echo "ax88179_178a"
+          echo "r8152"
+          echo "cdc_ether"
+        } >> mnt/etc/initramfs-tools/modules      
+        
         bash -c "echo 'fake /usr ext4 fake 0 1' > mnt/etc/fstab"
         chroot mnt/ apt update && chroot mnt/ apt install ${{ matrix.config.kernel }} -y
-        bash -c "echo '/dev/sda / ext4 errors=remount-ro 0 1' > mnt/etc/fstab"
+        bash -c "echo '/dev/vda / ext4 errors=remount-ro 0 1' > mnt/etc/fstab"
     
     - name: '🚧 Install SSH'
       if: ${{ !contains(matrix.config.arch, 'loong64') }}
