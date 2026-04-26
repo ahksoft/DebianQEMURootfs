@@ -62,21 +62,7 @@ jobs:
 #              image: 'lazymio/qemu-full:v8.1.4',
 #              iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
 #            }
-          - { 
-              os: ubuntu-latest, 
-              suite: trixie,
-              arch: armhf,
-              qemu-arch: "arm",
-              name: 'Debian-trixie-armhf-armmp',
-              kernel: 'linux-image-armmp',
-              artifact: 'debian-trixie-armhf-armmp',
-              hostname: 'debian-trixie-armhf-armmp',
-              qcow2: 'debian-trixie-armhf-armmp.qcow2',
-              rootfs: 'debian-trixie-armhf-armmp.tar.xz',
-              pool: 'http://deb.debian.org/debian',
-              image: 'lazymio/qemu-full:v8.1.4',
-              iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
-            }
+#        0
           # - { 
           #     os: ubuntu-latest, 
           #     suite: trixie,
@@ -90,21 +76,21 @@ jobs:
           #     rootfs: 'debian-trixie-armel-versatile.tar.xz',
           #     iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
           #   }
-#          - { 
-#              os: ubuntu-latest, 
-#              suite: trixie,
-#              arch: arm64,
-#              qemu-arch: "aarch64",
-#              name: 'Debian-trixie-arm64',
-#              kernel: 'linux-image-arm64',
-#              artifact: 'debian-trixie-arm64',
-#              hostname: 'debian-trixie-arm64',
-#              qcow2: 'debian-trixie-arm64.qcow2',
-#              rootfs: 'debian-trixie-arm64.tar.xz',
-#              pool: 'http://deb.debian.org/debian',
-#              image: 'lazymio/qemu-full:v7.2.8', # v8.x will segfault, no idea
-#              iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
-#            }
+          - { 
+              os: ubuntu-latest, 
+              suite: trixie,
+              arch: arm64,
+              qemu-arch: "aarch64",
+              name: 'Debian-trixie-arm64',
+              kernel: 'linux-image-arm64',
+              artifact: 'debian-trixie-arm64',
+              hostname: 'debian-trixie-arm64',
+              qcow2: 'debian-trixie-arm64.qcow2',
+              rootfs: 'debian-trixie-arm64.tar.xz'
+              pool: 'http://deb.debian.org/debian',
+              image: 'lazymio/qemu-full:v7.2.8', # v8.x will segfault, no idea
+              iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
+            }
 #          - { 
 #              os: ubuntu-latest, 
 #              suite: trixie,
