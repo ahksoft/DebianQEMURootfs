@@ -13,152 +13,132 @@ jobs:
       image: ${{ matrix.config.image }}
       options: --privileged
     name: ${{ matrix.config.name }}
+
     strategy:
       fail-fast: false
       matrix:
         config:
-          - { 
-              os: ubuntu-latest, 
+          - {
+              os: ubuntu-latest,
               suite: trixie,
               arch: arm64,
               qemu-arch: "aarch64",
-              name: 'Debian-trixie-arm64',
-              kernel: 'linux-image-arm64',
-              artifact: 'debian-trixie-arm64',
-              hostname: 'debian-trixie-arm64',
-              qcow2: 'debian-trixie-arm64.qcow2',
-              rootfs: 'debian-trixie-arm64.tar.xz',
-              pool: 'http://deb.debian.org/debian',
-              image: 'lazymio/qemu-full:v7.2.8',
-              iface: 'eth0'
+              name: "Debian-trixie-arm64",
+              kernel: "linux-image-arm64",
+              artifact: "debian-trixie-arm64",
+              hostname: "debian-trixie-arm64",
+              qcow2: "debian-trixie-arm64.qcow2",
+              rootfs: "debian-trixie-arm64.tar.xz",
+              pool: "http://deb.debian.org/debian",
+              image: "lazymio/qemu-full:v7.2.8",
+              iface: "eth0"
             }
+
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: '🚧 Mount binfmt_misc'
-      shell: bash
-      run: |
-        mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
-        update-binfmts --display
-        ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --importdir /opt/binfmt_fixed --unimport
-        ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --importdir /opt/binfmt_fixed --import
-        ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --enable
-        update-binfmts --display
-    
-    - name: '🚧 Dependency'
-      shell: bash
-      run: |
-        apt update && apt install libguestfs-tools linux-image-generic debian-ports-archive-keyring aria2 -y
-      
-    - name: '🚧 Deboostrap 1st stage'
-      shell: bash
-      run: |
-        mkdir mnt
-        debootstrap --foreign --arch=${{ matrix.config.arch }} --include=locales ${{ matrix.config.suite }} mnt/ ${{ matrix.config.pool }}
+      - name: 🚧 Mount binfmt_misc
+        run: |
+          mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+          update-binfmts --display
+          ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --importdir /opt/binfmt_fixed --unimport
+          ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --importdir /opt/binfmt_fixed --import
+          ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --enable
+          update-binfmts --display
 
-    - name: '🚧 Deboostrap 2nd stage'
-      shell: bash
-      run: |
-        chroot mnt/ debootstrap/debootstrap --second-stage
+      - name: 🚧 Dependency
+        run: |
+          apt update && apt install libguestfs-tools linux-image-generic debian-ports-archive-keyring aria2 -y
 
-    - name: '🚧 Install Kernel & fstab'
-      shell: bash
-      run: |
-        bash -c "echo 'fake /usr ext4 fake 0 1' > mnt/etc/fstab"
-        chroot mnt/ apt update && chroot mnt/ apt install initramfs-tools -y
-        sed -i 's/MODULES=most/MODULES=list/' mnt/etc/initramfs-tools/initramfs.conf
-        
-        {
-          echo "virtio_mmio"
-          echo "virtio_blk"
-          echo "virtio_net"
-          echo "virtio_pci"
-          echo "ext4"
-          echo "sd_mod"
-          echo "xhci-pci"
-          echo "uhci-hcd"
-          echo "ehci-pci"
-          echo "usb-storage"
-          echo "uas"
-          echo "usbhid"
-          echo "usbnet"
-          echo "ax88179_178a"
-          echo "r8152"
-          echo "cdc_ether"
-        } >> mnt/etc/initramfs-tools/modules      
-        
-        chroot mnt/ apt update && chroot mnt/ apt install ${{ matrix.config.kernel }} -y
-        bash -c "echo '/dev/vda / ext4 errors=remount-ro 0 1' > mnt/etc/fstab"
-    
-    - name: '🚧 Install SSH + sudo'
-      shell: bash
-      run: |
-        chroot mnt/ apt install openssh-server sudo -y
+      - name: 🚧 Deboostrap 1st stage
+        run: |
+          mkdir mnt
+          debootstrap --foreign --arch=${{ matrix.config.arch }} --include=locales ${{ matrix.config.suite }} mnt/ ${{ matrix.config.pool }}
 
-    - name: '🚧 Configure SSH (Full Access)'
-  shell: bash
-  run: |
-    echo "Port 22" > mnt/etc/ssh/sshd_config
-    echo "ListenAddress 0.0.0.0" >> mnt/etc/ssh/sshd_config
-    echo "ListenAddress ::" >> mnt/etc/ssh/sshd_config
+      - name: 🚧 Deboostrap 2nd stage
+        run: |
+          chroot mnt/ debootstrap/debootstrap --second-stage
 
-    echo "PermitRootLogin yes" >> mnt/etc/ssh/sshd_config
-    echo "PasswordAuthentication yes" >> mnt/etc/ssh/sshd_config
-    echo "PubkeyAuthentication yes" >> mnt/etc/ssh/sshd_config
+      - name: 🚧 Install Kernel & fstab
+        run: |
+          echo 'fake /usr ext4 fake 0 1' > mnt/etc/fstab
+          chroot mnt/ apt update
+          chroot mnt/ apt install initramfs-tools -y
 
-    echo "AllowTcpForwarding yes" >> mnt/etc/ssh/sshd_config
-    echo "GatewayPorts yes" >> mnt/etc/ssh/sshd_config
-    echo "AllowStreamLocalForwarding yes" >> mnt/etc/ssh/sshd_config
-    echo "PermitTunnel yes" >> mnt/etc/ssh/sshd_config
-    echo "AllowAgentForwarding yes" >> mnt/etc/ssh/sshd_config
+          sed -i 's/MODULES=most/MODULES=list/' mnt/etc/initramfs-tools/initramfs.conf
 
-    echo "X11Forwarding yes" >> mnt/etc/ssh/sshd_config
-    echo "X11UseLocalhost no" >> mnt/etc/ssh/sshd_config
+          printf "%s\n" \
+          virtio_mmio virtio_blk virtio_net virtio_pci ext4 sd_mod \
+          xhci-pci uhci-hcd ehci-pci \
+          usb-storage uas usbhid usbnet \
+          ax88179_178a r8152 cdc_ether \
+          >> mnt/etc/initramfs-tools/modules
 
-    echo "UsePAM yes" >> mnt/etc/ssh/sshd_config
+          chroot mnt/ apt update
+          chroot mnt/ apt install ${{ matrix.config.kernel }} -y
 
-    - name: '🚧 Configure Debian'
-      shell: bash
-      run: |
-        bash -c "ls -lha mnt/etc/network/"
-        bash -c "echo >> mnt/etc/network/interfaces"
-        bash -c "echo 'auto ${{ matrix.config.iface }}' >> mnt/etc/network/interfaces"
-        bash -c "echo 'iface ${{ matrix.config.iface }} inet dhcp' >> mnt/etc/network/interfaces"
-        bash -c "cat /dev/null > mnt/etc/machine-id"
-        bash -c "echo ${{ matrix.config.hostname }} > mnt/etc/hostname"
+          echo '/dev/vda / ext4 errors=remount-ro 0 1' > mnt/etc/fstab
 
-        chroot mnt bash -c "adduser --disabled-password --gecos '' debian"
+      - name: 🚧 Install SSH + sudo
+        run: |
+          chroot mnt/ apt install openssh-server sudo -y
 
-        chroot mnt bash -c 'echo "root:root" | chpasswd'
-        chroot mnt bash -c 'echo "debian:debian" | chpasswd'
+      - name: 🚧 Configure SSH (Full Access)
+        run: |
+          printf "%s\n" \
+          "Port 22" \
+          "ListenAddress 0.0.0.0" \
+          "ListenAddress ::" \
+          "PermitRootLogin yes" \
+          "PasswordAuthentication yes" \
+          "PubkeyAuthentication yes" \
+          "AllowTcpForwarding yes" \
+          "GatewayPorts yes" \
+          "AllowStreamLocalForwarding yes" \
+          "PermitTunnel yes" \
+          "AllowAgentForwarding yes" \
+          "X11Forwarding yes" \
+          "X11UseLocalhost no" \
+          "UsePAM yes" \
+          > mnt/etc/ssh/sshd_config
 
-        # Give full root access
-        echo "debian ALL=(ALL:ALL) NOPASSWD: ALL" > mnt/etc/sudoers.d/debian
-        chmod 440 mnt/etc/sudoers.d/debian
+      - name: 🚧 Configure Debian
+        run: |
+          echo >> mnt/etc/network/interfaces
+          echo "auto ${{ matrix.config.iface }}" >> mnt/etc/network/interfaces
+          echo "iface ${{ matrix.config.iface }} inet dhcp" >> mnt/etc/network/interfaces
 
-    - name: '📦 Pack qcow2'
-      shell: bash
-      run: |
-        mkdir artifact
-        virt-make-fs --type=ext4 --size=5G mnt raw.img
-        qemu-img convert -c -f raw -O qcow2 raw.img artifact/${{ matrix.config.qcow2 }}
+          : > mnt/etc/machine-id
+          echo "${{ matrix.config.hostname }}" > mnt/etc/hostname
 
-    - name: '📦 Pack Initrd & Kernel'
-      shell: bash
-      run: |
-        cp mnt/boot/vmlinu* ./artifact/
-        cp mnt/boot/initrd.img-* ./artifact/
+          chroot mnt bash -c "adduser --disabled-password --gecos '' debian"
 
-    - name: '📦 Pack Rootfs'
-      shell: bash
-      run: |
-        tar caf artifact/${{ matrix.config.rootfs }} --one-file-system mnt
+          chroot mnt bash -c 'echo "root:root" | chpasswd'
+          chroot mnt bash -c 'echo "debian:debian" | chpasswd'
 
-    - name: '📤 Upload artifact'
-      uses: actions/upload-artifact@v4
-      with:
-        path: ./artifact/
-        name: artifact-${{ matrix.config.arch }}
+          echo "debian ALL=(ALL:ALL) NOPASSWD: ALL" > mnt/etc/sudoers.d/debian
+          chmod 440 mnt/etc/sudoers.d/debian
+
+      - name: 📦 Pack qcow2
+        run: |
+          mkdir artifact
+          virt-make-fs --type=ext4 --size=5G mnt raw.img
+          qemu-img convert -c -f raw -O qcow2 raw.img artifact/${{ matrix.config.qcow2 }}
+
+      - name: 📦 Pack Initrd & Kernel
+        run: |
+          cp mnt/boot/vmlinu* ./artifact/
+          cp mnt/boot/initrd.img-* ./artifact/
+
+      - name: 📦 Pack Rootfs
+        run: |
+          tar caf artifact/${{ matrix.config.rootfs }} --one-file-system mnt
+
+      - name: 📤 Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: ./artifact/
+          name: artifact-${{ matrix.config.arch }}
 
   publish:
     needs: [Build]
@@ -170,12 +150,11 @@ jobs:
           path: artifact
           merge-multiple: true
 
-      - name: '📦 Check artifacts'
-        shell: bash
+      - name: 📦 Check artifacts
         run: |
           ls -la artifact/
-      
-      - name: '📦 Release'
+
+      - name: 📦 Release
         if: startsWith(github.ref, 'refs/tags')
         uses: softprops/action-gh-release@v2
         with:
