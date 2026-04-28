@@ -96,28 +96,26 @@ jobs:
         chroot mnt/ apt install openssh-server sudo -y
 
     - name: '🚧 Configure SSH (Full Access)'
-      shell: bash
-      run: |
-        cat > mnt/etc/ssh/sshd_config << 'EOF'
-Port 22
-ListenAddress 0.0.0.0
-ListenAddress ::
+  shell: bash
+  run: |
+    echo "Port 22" > mnt/etc/ssh/sshd_config
+    echo "ListenAddress 0.0.0.0" >> mnt/etc/ssh/sshd_config
+    echo "ListenAddress ::" >> mnt/etc/ssh/sshd_config
 
-PermitRootLogin yes
-PasswordAuthentication yes
-PubkeyAuthentication yes
+    echo "PermitRootLogin yes" >> mnt/etc/ssh/sshd_config
+    echo "PasswordAuthentication yes" >> mnt/etc/ssh/sshd_config
+    echo "PubkeyAuthentication yes" >> mnt/etc/ssh/sshd_config
 
-AllowTcpForwarding yes
-GatewayPorts yes
-AllowStreamLocalForwarding yes
-PermitTunnel yes
-AllowAgentForwarding yes
+    echo "AllowTcpForwarding yes" >> mnt/etc/ssh/sshd_config
+    echo "GatewayPorts yes" >> mnt/etc/ssh/sshd_config
+    echo "AllowStreamLocalForwarding yes" >> mnt/etc/ssh/sshd_config
+    echo "PermitTunnel yes" >> mnt/etc/ssh/sshd_config
+    echo "AllowAgentForwarding yes" >> mnt/etc/ssh/sshd_config
 
-X11Forwarding yes
-X11UseLocalhost no
+    echo "X11Forwarding yes" >> mnt/etc/ssh/sshd_config
+    echo "X11UseLocalhost no" >> mnt/etc/ssh/sshd_config
 
-UsePAM yes
-EOF
+    echo "UsePAM yes" >> mnt/etc/ssh/sshd_config
 
     - name: '🚧 Configure Debian'
       shell: bash
