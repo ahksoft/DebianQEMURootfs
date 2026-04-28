@@ -17,65 +17,6 @@ jobs:
       fail-fast: false
       matrix:
         config:
-#          - { 
-#              os: ubuntu-latest, 
-#              suite: trixie,
-#              arch: amd64,
-#              qemu-arch: "x86_64",
-#              name: 'Debian-trixie-amd64',
-#              kernel: 'linux-image-amd64',
-#              artifact: 'debian-trixie-amd64',
-#              hostname: 'debian-trixie-amd64',
-#              qcow2: 'debian-trixie-amd64.qcow2',
-#              rootfs: 'debian-trixie-amd64.tar.xz',
-#              pool: 'http://deb.debian.org/debian',
-#              image: 'lazymio/qemu-full:v8.1.4',
-#              iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
-#            }
-#          - { 
-#              os: ubuntu-latest, 
-#              suite: trixie,
-#              arch: mipsel,
-#              qemu-arch: "mipsel",
-#              name: 'Debian-trixie-mipsel-malta',
-#              kernel: 'linux-image-4kc-malta',
-#              artifact: 'debian-trixie-mipsel-malta',
-#              hostname: 'debian-trixie-mipsel-malta',
-#              qcow2: 'debian-trixie-mipsel-malta.qcow2',
-#              rootfs: 'debian-trixie-mipsel-malta.tar.xz',
-#              pool: 'http://deb.debian.org/debian',
-#              image: 'lazymio/qemu-full:v8.1.4',
-#              iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
-#            }
-#          - { 
-#              os: ubuntu-latest, 
-#              suite: trixie,
-#              arch: mips64el,
-#              qemu-arch: "mips64el",
-#              name: 'Debian-trixie-mips64el-malta',
-#              kernel: 'linux-image-5kc-malta',
-#              artifact: 'debian-trixie-mips64el-malta',
-#              hostname: 'debian-trixie-mips64el-malta',
-#              qcow2: 'debian-trixie-mips64el-malta.qcow2',
-#              rootfs: 'debian-trixie-mips64el-malta.tar.xz',
-#              pool: 'http://deb.debian.org/debian',
-#              image: 'lazymio/qemu-full:v8.1.4',
-#              iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
-#            }
-#        0
-          # - { 
-          #     os: ubuntu-latest, 
-          #     suite: trixie,
-          #     arch: armel,
-          #     qemu-arch: "arm",
-          #     name: 'Debian-trixie-armel-versatile',
-          #     kernel: 'linux-image-versatile', # Has been removed: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=977126
-          #     artifact: 'debian-trixie-armel-versatile',
-          #     hostname: 'debian-trixie-armel-versatile',
-          #     qcow2: 'debian-trixie-armel-versatile.qcow2',
-          #     rootfs: 'debian-trixie-armel-versatile.tar.xz',
-          #     iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
-          #   }
           - { 
               os: ubuntu-latest, 
               suite: trixie,
@@ -86,103 +27,13 @@ jobs:
               artifact: 'debian-trixie-arm64',
               hostname: 'debian-trixie-arm64',
               qcow2: 'debian-trixie-arm64.qcow2',
-              rootfs: 'debian-trixie-arm64.tar.xz'
+              rootfs: 'debian-trixie-arm64.tar.xz',
               pool: 'http://deb.debian.org/debian',
-              image: 'lazymio/qemu-full:v7.2.8', # v8.x will segfault, no idea
-              iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
+              image: 'lazymio/qemu-full:v7.2.8',
+              iface: 'eth0'
             }
-#          - { 
-#              os: ubuntu-latest, 
-#              suite: trixie,
-#              arch: i386,
-#              qemu-arch: "i386",
-#              name: 'Debian-trixie-i386',
-#              kernel: 'linux-image-686',
-#              artifact: 'debian-trixie-i386',
-#              hostname: 'debian-trixie-i386',
-#              qcow2: 'debian-trixie-i386.qcow2',
-#              rootfs: 'debian-trixie-i386.tar.xz',
-#              pool: 'http://deb.debian.org/debian',
-#              image: 'lazymio/qemu-full:v8.1.4',
-#              iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
-#            }
-#          - { 
-#              os: ubuntu-latest, 
-#              suite: unstable,
-#              arch: riscv64,
-#              qemu-arch: "riscv64",
-#              name: 'Debian-trixie-riscv64',
-#              kernel: 'linux-image-riscv64',
-#              artifact: 'debian-trixie-riscv64',
-#              hostname: 'debian-trixie-riscv64',
-#              qcow2: 'debian-trixie-riscv64.qcow2',
-#              rootfs: 'debian-trixie-riscv64.tar.xz',
-#              pool: 'http://deb.debian.org/debian',
-#              image: 'lazymio/qemu-full:v8.2.0',
-#              iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
-#            }
-#          - { 
-#              os: ubuntu-latest, 
-#              suite: trixie,
-#              arch: ppc64el,
-#              qemu-arch: "ppc64le",
-#              name: 'Debian-trixie-ppc64el',
-#              kernel: 'linux-image-powerpc64le',
-#              artifact: 'debian-trixie-ppc64el',
-#              hostname: 'debian-trixie-ppc64el',
-#              qcow2: 'debian-trixie-ppc64el.qcow2',
-#              rootfs: 'debian-trixie-ppc64el.tar.xz',
-#              pool: 'http://deb.debian.org/debian',
-#              image: 'lazymio/qemu-full:v8.1.4',
-#              iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
-#            }
-#          - { 
-#              os: ubuntu-latest, 
-#              suite: trixie,
-#              arch: s390x,
-#              qemu-arch: "s390x",
-#              name: 'Debian-trixie-s390x',
-#              kernel: 'linux-image-s390x',
-#              artifact: 'debian-trixie-s390x',
-#              hostname: 'debian-trixie-s390x',
-#              qcow2: 'debian-trixie-s390x.qcow2',
-#              rootfs: 'debian-trixie-s390x.tar.xz',
-#              pool: 'http://deb.debian.org/debian',
-#              image: 'lazymio/qemu-full:v8.2.0',
-#              iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
-#            }
-          # - { # Known not working: https://www.mail-archive.com/debian-bugs-dist@lists.debian.org/msg1779934.html
-          #     os: ubuntu-latest, 
-          #     suite: trixie,
-          #     arch: armel,
-          #     qemu-arch: "arm",
-          #     name: 'Debian-trixie-rpi',
-          #     kernel: 'linux-image-rpi',
-          #     artifact: 'debian-trixie-rpi',
-          #     hostname: 'debian-trixie-rpi',
-          #     qcow2: 'debian-trixie-rpi.qcow2',
-          #     rootfs: 'debian-trixie-rpi.tar.xz',
-          #     pool: 'http://deb.debian.org/debian',
-          #     image: 'lazymio/qemu-full:v8.2.0',
-          #     iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
-          #   }
-#          - { # Disabled due to no kernel available 
-#              os: ubuntu-latest, 
-#              suite: unstable,
-#              arch: loong64,
-#              qemu-arch: "loongarch64",
-#              name: 'Debian-trixie-loong64',
-#              kernel: 'linux-image-loong64',
-#              artifact: 'debian-trixie-loong64',
-#              hostname: 'debian-trixie-loong64',
-#              qcow2: 'debian-trixie-loong64.qcow2',
-#              rootfs: 'debian-trixie-loong64.tar.xz',
-#              pool: 'http://ftp.ports.debian.org/debian-ports',
-#              image: 'lazymio/qemu-full:v8.2.0',
-#              iface: 'eth0' # Append "net.ifnames=0", ref: https://wiki.debian.org/NetworkInterfaceNames
-#            }
     steps:
-    - uses: actions/checkout@v4 # Also updated checkout to latest stable
+    - uses: actions/checkout@v4
 
     - name: '🚧 Mount binfmt_misc'
       shell: bash
@@ -200,7 +51,6 @@ jobs:
         apt update && apt install libguestfs-tools linux-image-generic debian-ports-archive-keyring aria2 -y
       
     - name: '🚧 Deboostrap 1st stage'
-      if: ${{ !contains(matrix.config.arch, 'loong64') }}
       shell: bash
       run: |
         mkdir mnt
@@ -212,7 +62,6 @@ jobs:
         chroot mnt/ debootstrap/debootstrap --second-stage
 
     - name: '🚧 Install Kernel & fstab'
-      if: ${{ !contains(matrix.config.arch, 'loong64') }}
       shell: bash
       run: |
         bash -c "echo 'fake /usr ext4 fake 0 1' > mnt/etc/fstab"
@@ -249,13 +98,11 @@ jobs:
         bash -c "echo '/dev/vda / ext4 errors=remount-ro 0 1' > mnt/etc/fstab"
     
     - name: '🚧 Install SSH'
-      if: ${{ !contains(matrix.config.arch, 'loong64') }}
       shell: bash
       run: |
         chroot mnt/ apt install openssh-server -y
 
     - name: '🚧 Configure Debian'
-      if: ${{ !contains(matrix.config.arch, 'loong64') }}
       shell: bash
       run: |
         bash -c "ls -lha mnt/etc/network/"
@@ -276,7 +123,6 @@ jobs:
         qemu-img convert -c -f raw -O qcow2 raw.img artifact/${{ matrix.config.qcow2 }}
 
     - name: '📦 Pack Initrd & Kernel'
-      if: ${{ !contains(matrix.config.arch, 'loong64') }}
       shell: bash
       run: |
         cp mnt/boot/vmlinu* ./artifact/
@@ -291,7 +137,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         path: ./artifact/
-        name: artifact-${{ matrix.config.arch }} # v4 requires unique names for parallel jobs
+        name: artifact-${{ matrix.config.arch }}
 
   publish:
     needs: [Build]
@@ -299,7 +145,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: artifact-* # v4 allows downloading multiple artifacts via patterns
+          pattern: artifact-*
           path: artifact
           merge-multiple: true
 
@@ -310,7 +156,8 @@ jobs:
       
       - name: '📦 Release'
         if: startsWith(github.ref, 'refs/tags')
-        uses: softprops/action-gh-release@v2 # Also updated to latest
+        uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.RELEASE_TOKEN }}
           files: ./artifact/*
+          
