@@ -75,29 +75,40 @@ jobs:
 
           sed -i 's/MODULES=most/MODULES=dep/' mnt/etc/initramfs-tools/initramfs.conf
 
-          cat >> mnt/etc/initramfs-tools/modules <<EOF
-virtio_mmio
-virtio_blk
-virtio_net
-virtio_pci
-ext4
-sd_mod
-xhci_pci
-uhci_hcd
-ehci_pci
-usb_storage
-uas
-usbhid
-usbnet
-ax88179_178a
-r8152
-cdc_ether
-kvm
-kvm_arm
-vhost_net
-vhost
-tun
-EOF
+- name: Install kernel & initramfs config
+  run: |
+    echo 'fake /usr ext4 fake 0 1' > mnt/etc/fstab
+
+    chroot mnt apt update
+    chroot mnt apt install -y initramfs-tools
+
+    sed -i 's/MODULES=most/MODULES=dep/' mnt/etc/initramfs-tools/initramfs.conf
+
+    echo "virtio_mmio" >> mnt/etc/initramfs-tools/modules
+    echo "virtio_blk" >> mnt/etc/initramfs-tools/modules
+    echo "virtio_net" >> mnt/etc/initramfs-tools/modules
+    echo "virtio_pci" >> mnt/etc/initramfs-tools/modules
+    echo "ext4" >> mnt/etc/initramfs-tools/modules
+    echo "sd_mod" >> mnt/etc/initramfs-tools/modules
+    echo "xhci_pci" >> mnt/etc/initramfs-tools/modules
+    echo "uhci_hcd" >> mnt/etc/initramfs-tools/modules
+    echo "ehci_pci" >> mnt/etc/initramfs-tools/modules
+    echo "usb_storage" >> mnt/etc/initramfs-tools/modules
+    echo "uas" >> mnt/etc/initramfs-tools/modules
+    echo "usbhid" >> mnt/etc/initramfs-tools/modules
+    echo "usbnet" >> mnt/etc/initramfs-tools/modules
+    echo "ax88179_178a" >> mnt/etc/initramfs-tools/modules
+    echo "r8152" >> mnt/etc/initramfs-tools/modules
+    echo "cdc_ether" >> mnt/etc/initramfs-tools/modules
+    echo "kvm" >> mnt/etc/initramfs-tools/modules
+    echo "kvm_arm" >> mnt/etc/initramfs-tools/modules
+    echo "vhost_net" >> mnt/etc/initramfs-tools/modules
+    echo "vhost" >> mnt/etc/initramfs-tools/modules
+    echo "tun" >> mnt/etc/initramfs-tools/modules
+
+    chroot mnt apt install -y ${{ matrix.config.kernel }}
+
+    echo '/dev/vda / ext4 errors=remount-ro 0 1' > mnt/etc/fstab
 
           chroot mnt apt install -y ${{ matrix.config.kernel }}
 
