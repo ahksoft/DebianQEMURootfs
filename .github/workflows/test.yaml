@@ -17,8 +17,8 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { 
-              os: ubuntu-latest, 
+          - {
+              os: ubuntu-latest,
               suite: trixie,
               arch: arm64,
               qemu-arch: "aarch64",
@@ -32,6 +32,7 @@ jobs:
               image: 'lazymio/qemu-full:v7.2.8',
               iface: 'eth0'
             }
+
     steps:
     - uses: actions/checkout@v4
 
@@ -72,39 +73,31 @@ jobs:
     - name: '🚧 Install Kernel & fstab'
       shell: bash
       run: |
-        bash -c "echo 'fake /usr ext4 fake 0 1' > mnt/etc/fstab"
+        echo 'fake /usr ext4 fake 0 1' > mnt/etc/fstab
         chroot mnt/ apt update
         chroot mnt/ apt install -y initramfs-tools
 
-        # Use 'dep' — safer than 'list' for arm64, loads dependency-resolved modules only
+        # Use 'dep' — safer than 'list' for arm64
         sed -i 's/MODULES=most/MODULES=dep/' mnt/etc/initramfs-tools/initramfs.conf
 
+        # Append kernel modules
         {
-          # Core VirtIO & Filesystem
           echo "virtio_mmio"
           echo "virtio_blk"
           echo "virtio_net"
           echo "virtio_pci"
           echo "ext4"
           echo "sd_mod"
-
-          # USB Core & Controllers (must use underscores)
           echo "xhci_pci"
           echo "uhci_hcd"
           echo "ehci_pci"
-
-          # USB Device Classes
           echo "usb_storage"
           echo "uas"
           echo "usbhid"
           echo "usbnet"
-
-          # Common USB Networking
           echo "ax88179_178a"
           echo "r8152"
           echo "cdc_ether"
-
-          # KVM / Virtualization
           echo "kvm"
           echo "kvm_arm"
           echo "vhost_net"
@@ -114,7 +107,7 @@ jobs:
 
         chroot mnt/ apt update
         chroot mnt/ apt install -y ${{ matrix.config.kernel }}
-        bash -c "echo '/dev/vda / ext4 errors=remount-ro 0 1' > mnt/etc/fstab"
+        echo '/dev/vda / ext4 errors=remount-ro 0 1' > mnt/etc/fstab
 
     - name: '🚧 Install Packages'
       shell: bash
@@ -126,13 +119,15 @@ jobs:
           x11-xserver-utils \
           xauth \
           xorg \
+          xfce4 \
+          xfce4-terminal \
           tigervnc-standalone-server \
           tigervnc-tools \
           dbus-x11 \
           net-tools \
           curl \
           wget \
-          micro \
+          vim \
           htop \
           qemu-kvm \
           libvirt-daemon-system \
@@ -140,159 +135,133 @@ jobs:
 
     - name: '🚧 Configure SSH — Full Access No Restrictions'
       shell: bash
+      env:
+        SSHD_CONFIG: |
+          Port 22
+          ListenAddress 0.0.0.0
+          ListenAddress ::
+          PermitRootLogin yes
+          PasswordAuthentication yes
+          PubkeyAuthentication yes
+          AuthorizedKeysFile .ssh/authorized_keys
+          PermitEmptyPasswords no
+          ChallengeResponseAuthentication no
+          UsePAM yes
+          MaxAuthTries 10
+          MaxSessions 20
+          X11Forwarding yes
+          X11DisplayOffset 10
+          X11UseLocalhost no
+          XAuthLocation /usr/bin/xauth
+          AllowTcpForwarding yes
+          GatewayPorts yes
+          AllowStreamLocalForwarding yes
+          PermitTunnel yes
+          AllowAgentForwarding yes
+          TCPKeepAlive yes
+          ClientAliveInterval 60
+          ClientAliveCountMax 10
+          PrintMotd yes
+          AcceptEnv LANG LC_* DISPLAY XAUTHORITY
+          Subsystem sftp /usr/lib/openssh/sftp-server
       run: |
-        cat > mnt/etc/ssh/sshd_config << 'EOF'
-# =============================================
-# Full Access SSH Config — No Restrictions
-# =============================================
-Port 22
-ListenAddress 0.0.0.0
-ListenAddress ::
-
-# ── Authentication ────────────────────────────
-PermitRootLogin yes
-PasswordAuthentication yes
-PubkeyAuthentication yes
-AuthorizedKeysFile .ssh/authorized_keys
-PermitEmptyPasswords no
-ChallengeResponseAuthentication no
-UsePAM yes
-MaxAuthTries 10
-MaxSessions 20
-
-# ── X11 Forwarding ────────────────────────────
-X11Forwarding yes
-X11DisplayOffset 10
-X11UseLocalhost no
-XAuthLocation /usr/bin/xauth
-
-# ── TCP / Port / Tunnel Forwarding ───────────
-AllowTcpForwarding yes
-GatewayPorts yes
-AllowStreamLocalForwarding yes
-PermitTunnel yes
-AllowAgentForwarding yes
-
-# ── Keepalive ─────────────────────────────────
-TCPKeepAlive yes
-ClientAliveInterval 60
-ClientAliveCountMax 10
-
-# ── Misc ──────────────────────────────────────
-PrintMotd yes
-AcceptEnv LANG LC_* DISPLAY XAUTHORITY
-Subsystem sftp /usr/lib/openssh/sftp-server
-EOF
+        echo "$SSHD_CONFIG" > mnt/etc/ssh/sshd_config
 
     - name: '🚧 Configure VNC'
       shell: bash
+      env:
+        VNC_XSTARTUP: |
+          #!/bin/bash
+          export DISPLAY=:1
+          export XDG_SESSION_TYPE=x11
+          unset SESSION_MANAGER
+          unset DBUS_SESSION_BUS_ADDRESS
+          exec startxfce4
+        VNC_START: |
+          #!/bin/bash
+          vncserver :1 \
+            -geometry 1280x720 \
+            -depth 24 \
+            -localhost no \
+            -SecurityTypes VncAuth \
+            -rfbport 5901
+          echo "VNC started on port 5901"
+          echo "Tunnel: ssh -L 5901:localhost:5901 debian@<host> -p 22"
+        VNC_STOP: |
+          #!/bin/bash
+          vncserver -kill :1
+          echo "VNC stopped"
       run: |
-        # ── debian user VNC ───────────────────
+        # debian user xstartup
         mkdir -p mnt/home/debian/.vnc
-        cat > mnt/home/debian/.vnc/xstartup << 'EOF'
-#!/bin/bash
-export DISPLAY=:1
-export XDG_SESSION_TYPE=x11
-unset SESSION_MANAGER
-unset DBUS_SESSION_BUS_ADDRESS
-exec startxfce4
-EOF
+        echo "$VNC_XSTARTUP" > mnt/home/debian/.vnc/xstartup
         chmod +x mnt/home/debian/.vnc/xstartup
 
-        # ── root user VNC ─────────────────────
+        # root user xstartup
         mkdir -p mnt/root/.vnc
-        cat > mnt/root/.vnc/xstartup << 'EOF'
-#!/bin/bash
-export DISPLAY=:1
-export XDG_SESSION_TYPE=x11
-unset SESSION_MANAGER
-unset DBUS_SESSION_BUS_ADDRESS
-exec startxfce4
-EOF
+        echo "$VNC_XSTARTUP" > mnt/root/.vnc/xstartup
         chmod +x mnt/root/.vnc/xstartup
 
-        # ── vncstart helper ───────────────────
-        cat > mnt/usr/local/bin/vncstart << 'EOF'
-#!/bin/bash
-vncserver :1 \
-  -geometry 1280x720 \
-  -depth 24 \
-  -localhost no \
-  -SecurityTypes VncAuth \
-  -rfbport 5901
-echo ""
-echo "  VNC started on port 5901"
-echo "  Direct connect : <host>:5901"
-echo "  SSH tunnel     : ssh -L 5901:localhost:5901 debian@<host> -p 22"
-echo "  Then connect VNC client to localhost:5901"
-echo ""
-EOF
+        # vncstart / vncstop helpers
+        echo "$VNC_START" > mnt/usr/local/bin/vncstart
+        echo "$VNC_STOP"  > mnt/usr/local/bin/vncstop
         chmod +x mnt/usr/local/bin/vncstart
-
-        # ── vncstop helper ────────────────────
-        cat > mnt/usr/local/bin/vncstop << 'EOF'
-#!/bin/bash
-vncserver -kill :1
-echo "VNC stopped"
-EOF
         chmod +x mnt/usr/local/bin/vncstop
 
     - name: '🚧 Configure Users & Permissions'
       shell: bash
+      env:
+        MOTD: |
+
+          Debian Trixie ARM64 QEMU Image
+          ================================
+          Users : root/root  |  debian/debian
+          debian has full passwordless sudo
+          ================================
+          SSH X11  : ssh -X debian@<host> -p 22
+          VNC      : run 'vncstart' then connect :5901
+          Tunnel   : ssh -L 5901:localhost:5901 debian@<host>
+          KVM check: kvm-ok
+          ================================
+
+        KVM_UDEV: |
+          KERNEL=="kvm", GROUP="kvm", MODE="0666"
+        DEBIAN_SUDOERS: |
+          debian ALL=(ALL:ALL) NOPASSWD: ALL
       run: |
-        # ── Network ───────────────────────────
-        bash -c "echo >> mnt/etc/network/interfaces"
-        bash -c "echo 'auto ${{ matrix.config.iface }}' >> mnt/etc/network/interfaces"
-        bash -c "echo 'iface ${{ matrix.config.iface }} inet dhcp' >> mnt/etc/network/interfaces"
+        # Network
+        echo ""                                          >> mnt/etc/network/interfaces
+        echo "auto ${{ matrix.config.iface }}"          >> mnt/etc/network/interfaces
+        echo "iface ${{ matrix.config.iface }} inet dhcp" >> mnt/etc/network/interfaces
 
-        # ── Identity ──────────────────────────
-        bash -c "cat /dev/null > mnt/etc/machine-id"
-        bash -c "echo '${{ matrix.config.hostname }}' > mnt/etc/hostname"
+        # Identity
+        cat /dev/null > mnt/etc/machine-id
+        echo '${{ matrix.config.hostname }}' > mnt/etc/hostname
 
-        # ── Create debian user ────────────────
+        # Create debian user & set passwords
         chroot mnt bash -c "adduser --disabled-password --gecos '' debian"
-
-        # ── Passwords ─────────────────────────
         chroot mnt bash -c 'echo "root:root" | chpasswd'
         chroot mnt bash -c 'echo "debian:debian" | chpasswd'
 
-        # ── Passwordless full sudo for debian ─
-        bash -c "echo 'debian ALL=(ALL:ALL) NOPASSWD: ALL' > mnt/etc/sudoers.d/debian"
+        # Passwordless full sudo
+        echo "$DEBIAN_SUDOERS" > mnt/etc/sudoers.d/debian
         chmod 440 mnt/etc/sudoers.d/debian
 
-        # ── Group memberships ─────────────────
+        # Group memberships
         chroot mnt bash -c "usermod -aG sudo,kvm,libvirt,video,audio,input,dialout,plugdev debian"
 
-        # ── KVM device permissions ────────────
-        bash -c "echo 'KERNEL==\"kvm\", GROUP=\"kvm\", MODE=\"0666\"' > mnt/etc/udev/rules.d/99-kvm.rules"
+        # KVM udev rule
+        echo "$KVM_UDEV" > mnt/etc/udev/rules.d/99-kvm.rules
 
-        # ── VNC passwords ─────────────────────
-        # debian user: password = "debian"
+        # VNC passwords (password: debian / root)
         chroot mnt bash -c "su - debian -c 'mkdir -p ~/.vnc && printf \"debian\ndebiandebian\n\" | vncpasswd && chmod 600 ~/.vnc/passwd'" || true
-        # root: password = "root"
         chroot mnt bash -c "mkdir -p /root/.vnc && printf 'root\nrootroot\n' | vncpasswd && chmod 600 /root/.vnc/passwd" || true
 
-        # ── Fix home ownership ────────────────
+        # Fix home ownership
         chroot mnt bash -c "chown -R debian:debian /home/debian"
 
-        # ── MOTD ──────────────────────────────
-        cat > mnt/etc/motd << 'EOF'
-
-  ╔══════════════════════════════════════════╗
-  ║   Debian Trixie ARM64 — QEMU Image       ║
-  ╠══════════════════════════════════════════╣
-  ║  Users:  root/root  |  debian/debian     ║
-  ║  debian has full passwordless sudo       ║
-  ╠══════════════════════════════════════════╣
-  ║  SSH X11  : ssh -X debian@<host> -p 22  ║
-  ║  VNC      : run 'vncstart'              ║
-  ║  VNC port : 5901                        ║
-  ║  Tunnel   : ssh -L 5901:localhost:5901  ║
-  ║             debian@<host> -p 22         ║
-  ║  KVM check: kvm-ok                      ║
-  ╚══════════════════════════════════════════╝
-
-EOF
+        # MOTD
+        echo "$MOTD" > mnt/etc/motd
 
     - name: '📦 Pack qcow2'
       shell: bash
