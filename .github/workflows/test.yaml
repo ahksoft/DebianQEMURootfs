@@ -1,4 +1,4 @@
-name: Build Debian Headless Rootfs (Full Power)
+name: Build Debian test Rootfs
 
 on:
   workflow_dispatch:
@@ -7,217 +7,179 @@ on:
       - "v*.*.*"
 
 jobs:
-  build:
+  Build:
     runs-on: ${{ matrix.config.os }}
     container:
       image: ${{ matrix.config.image }}
       options: --privileged
-
     name: ${{ matrix.config.name }}
-
     strategy:
       fail-fast: false
       matrix:
         config:
-          - {
-              os: ubuntu-latest,
+          - { 
+              os: ubuntu-latest, 
               suite: trixie,
               arch: arm64,
-              name: "Debian-trixie-arm64",
-              kernel: "linux-image-arm64",
-              hostname: "debian-trixie-arm64",
-              qcow2: "debian-trixie-arm64.qcow2",
-              rootfs: "debian-trixie-arm64.tar.xz",
-              pool: "http://deb.debian.org/debian",
-              image: "lazymio/qemu-full:v7.2.8",
-              iface: "eth0"
+              qemu-arch: "aarch64",
+              name: 'Debian-trixie-arm64',
+              kernel: 'linux-image-arm64',
+              artifact: 'debian-trixie-arm64',
+              hostname: 'debian-trixie-arm64',
+              qcow2: 'debian-trixie-arm64.qcow2',
+              rootfs: 'debian-trixie-arm64.tar.xz',
+              pool: 'http://deb.debian.org/debian',
+              image: 'lazymio/qemu-full:v7.2.8',
+              iface: 'eth0'
             }
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Mount binfmt_misc
-        run: |
-          mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc || true
-          update-binfmts --display || true
+    - name: '🚧 Mount binfmt_misc'
+      shell: bash
+      run: |
+        mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+        update-binfmts --display
+        ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --importdir /opt/binfmt_fixed --unimport
+        ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --importdir /opt/binfmt_fixed --import
+        ls /opt/binfmt_fixed/ | awk '{print $1}' | xargs -L 1 update-binfmts --enable
+        update-binfmts --display
+    
+    - name: '🚧 Dependency'
+      shell: bash
+      run: |
+        apt update && apt install libguestfs-tools linux-image-generic debian-ports-archive-keyring aria2 -y
+      
+    - name: '🚧 Deboostrap 1st stage'
+      shell: bash
+      run: |
+        mkdir mnt
+        debootstrap --foreign --arch=${{ matrix.config.arch }} --include=locales ${{ matrix.config.suite }} mnt/ ${{ matrix.config.pool }}
 
-      - name: Install dependencies
-        run: |
-          apt update && apt install -y \
-            debootstrap \
-            qemu-user-static \
-            binfmt-support \
-            libguestfs-tools \
-            aria2 \
-            sudo \
-            linux-image-generic
+    - name: '🚧 Deboostrap 2nd stage'
+      shell: bash
+      run: |
+        chroot mnt/ debootstrap/debootstrap --second-stage
 
-      - name: Debootstrap (stage 1)
-        run: |
-          mkdir mnt
-          debootstrap \
-            --foreign \
-            --arch=${{ matrix.config.arch }} \
-            --include=locales \
-            ${{ matrix.config.suite }} mnt ${{ matrix.config.pool }}
+    - name: '🚧 Install Kernel & fstab'
+      shell: bash
+      run: |
+        bash -c "echo 'fake /usr ext4 fake 0 1' > mnt/etc/fstab"
+        chroot mnt/ apt update && chroot mnt/ apt install initramfs-tools -y
+        sed -i 's/MODULES=most/MODULES=list/' mnt/etc/initramfs-tools/initramfs.conf
+        
+        {
+          echo "virtio_mmio"
+          echo "virtio_blk"
+          echo "virtio_net"
+          echo "virtio_pci"
+          echo "ext4"
+          echo "sd_mod"
+          echo "xhci-pci"
+          echo "uhci-hcd"
+          echo "ehci-pci"
+          echo "usb-storage"
+          echo "uas"
+          echo "usbhid"
+          echo "usbnet"
+          echo "ax88179_178a"
+          echo "r8152"
+          echo "cdc_ether"
+        } >> mnt/etc/initramfs-tools/modules      
+        
+        chroot mnt/ apt update && chroot mnt/ apt install ${{ matrix.config.kernel }} -y
+        bash -c "echo '/dev/vda / ext4 errors=remount-ro 0 1' > mnt/etc/fstab"
+    
+    - name: '🚧 Install SSH + sudo'
+      shell: bash
+      run: |
+        chroot mnt/ apt install openssh-server sudo -y
 
-      - name: Debootstrap (stage 2)
-        run: |
-          chroot mnt /debootstrap/debootstrap --second-stage
-
-      - name: Install kernel & initramfs config
-        run: |
-          echo 'fake /usr ext4 fake 0 1' > mnt/etc/fstab
-
-          chroot mnt apt update
-          chroot mnt apt install -y initramfs-tools
-
-          sed -i 's/MODULES=most/MODULES=dep/' mnt/etc/initramfs-tools/initramfs.conf
-
-          cat <<'EOF' > mnt/etc/initramfs-tools/modules
-virtio_mmio
-virtio_blk
-virtio_net
-virtio_pci
-ext4
-sd_mod
-xhci_pci
-uhci_hcd
-ehci_pci
-usb_storage
-uas
-usbhid
-usbnet
-ax88179_178a
-r8152
-cdc_ether
-kvm
-kvm_arm
-vhost_net
-vhost
-tun
-EOF
-
-          chroot mnt apt install -y ${{ matrix.config.kernel }}
-
-          echo '/dev/vda / ext4 errors=remount-ro 0 1' > mnt/etc/fstab
-
-      - name: Install core packages (no GUI)
-        run: |
-          chroot mnt apt install -y \
-            openssh-server \
-            sudo \
-            net-tools \
-            curl \
-            wget \
-            vim \
-            htop \
-            ca-certificates \
-            dbus \
-            systemd \
-            systemd-sysv \
-            iproute2 \
-            iputils-ping \
-            dnsutils \
-            qemu-kvm \
-            libvirt-daemon-system \
-            cpu-checker
-
-      - name: Configure SSH
-        run: |
-          cat > mnt/etc/ssh/sshd_config << 'EOF'
+    - name: '🚧 Configure SSH (Full Access)'
+      shell: bash
+      run: |
+        cat > mnt/etc/ssh/sshd_config << 'EOF'
 Port 22
 ListenAddress 0.0.0.0
+ListenAddress ::
+
 PermitRootLogin yes
 PasswordAuthentication yes
 PubkeyAuthentication yes
-X11Forwarding yes
+
 AllowTcpForwarding yes
 GatewayPorts yes
+AllowStreamLocalForwarding yes
 PermitTunnel yes
+AllowAgentForwarding yes
+
+X11Forwarding yes
+X11UseLocalhost no
+
+UsePAM yes
 EOF
 
-      - name: Configure system
-        run: |
-          echo "${{ matrix.config.hostname }}" > mnt/etc/hostname
+    - name: '🚧 Configure Debian'
+      shell: bash
+      run: |
+        bash -c "ls -lha mnt/etc/network/"
+        bash -c "echo >> mnt/etc/network/interfaces"
+        bash -c "echo 'auto ${{ matrix.config.iface }}' >> mnt/etc/network/interfaces"
+        bash -c "echo 'iface ${{ matrix.config.iface }} inet dhcp' >> mnt/etc/network/interfaces"
+        bash -c "cat /dev/null > mnt/etc/machine-id"
+        bash -c "echo ${{ matrix.config.hostname }} > mnt/etc/hostname"
 
-          echo "auto ${{ matrix.config.iface }}" > mnt/etc/network/interfaces
-          echo "iface ${{ matrix.config.iface }} inet dhcp" >> mnt/etc/network/interfaces
+        chroot mnt bash -c "adduser --disabled-password --gecos '' debian"
 
-          : > mnt/etc/machine-id
+        chroot mnt bash -c 'echo "root:root" | chpasswd'
+        chroot mnt bash -c 'echo "debian:debian" | chpasswd'
 
-      - name: Configure users
-        run: |
-          chroot mnt adduser --disabled-password --gecos "" debian
+        # Give full root access
+        echo "debian ALL=(ALL:ALL) NOPASSWD: ALL" > mnt/etc/sudoers.d/debian
+        chmod 440 mnt/etc/sudoers.d/debian
 
-          chroot mnt bash -c 'echo root:root | chpasswd'
-          chroot mnt bash -c 'echo debian:debian | chpasswd'
+    - name: '📦 Pack qcow2'
+      shell: bash
+      run: |
+        mkdir artifact
+        virt-make-fs --type=ext4 --size=5G mnt raw.img
+        qemu-img convert -c -f raw -O qcow2 raw.img artifact/${{ matrix.config.qcow2 }}
 
-          echo "debian ALL=(ALL:ALL) NOPASSWD: ALL" > mnt/etc/sudoers.d/debian
-          chmod 440 mnt/etc/sudoers.d/debian
+    - name: '📦 Pack Initrd & Kernel'
+      shell: bash
+      run: |
+        cp mnt/boot/vmlinu* ./artifact/
+        cp mnt/boot/initrd.img-* ./artifact/
 
-          chroot mnt usermod -aG sudo,kvm,libvirt,video,audio,input,dialout,plugdev debian
+    - name: '📦 Pack Rootfs'
+      shell: bash
+      run: |
+        tar caf artifact/${{ matrix.config.rootfs }} --one-file-system mnt
 
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666"' > mnt/etc/udev/rules.d/99-kvm.rules
-
-          chroot mnt chown -R debian:debian /home/debian
-
-      - name: Create MOTD
-        run: |
-          cat > mnt/etc/motd << 'EOF'
-
-Debian Trixie ARM64 (Headless)
-==============================
-
-Users:
-  root / root
-  debian / debian
-
-Features:
-  - SSH full access
-  - KVM enabled
-  - No GUI (lightweight)
-
-EOF
-
-      - name: Build QCOW2 image
-        run: |
-          mkdir -p artifact
-          virt-make-fs --type=ext4 --size=5G mnt raw.img
-          qemu-img convert -c -f raw -O qcow2 raw.img artifact/${{ matrix.config.qcow2 }}
-
-      - name: Pack kernel & initrd
-        run: |
-          cp mnt/boot/vmlinuz* artifact/ || true
-          cp mnt/boot/initrd.img-* artifact/ || true
-
-      - name: Pack rootfs
-        run: |
-          tar caf artifact/${{ matrix.config.rootfs }} --one-file-system mnt
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-${{ matrix.config.arch }}
-          path: artifact/
+    - name: '📤 Upload artifact'
+      uses: actions/upload-artifact@v4
+      with:
+        path: ./artifact/
+        name: artifact-${{ matrix.config.arch }}
 
   publish:
-    needs: build
+    needs: [Build]
     runs-on: ubuntu-latest
-
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
+          pattern: artifact-*
           path: artifact
+          merge-multiple: true
 
-      - name: List artifacts
-        run: ls -lah artifact/
-
-      - name: Release
+      - name: '📦 Check artifacts'
+        shell: bash
+        run: |
+          ls -la artifact/
+      
+      - name: '📦 Release'
         if: startsWith(github.ref, 'refs/tags')
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.RELEASE_TOKEN }}
-          files: artifact/**/*
+          files: ./artifact/*
