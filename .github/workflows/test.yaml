@@ -25,7 +25,6 @@ jobs:
               arch: arm64,
               name: "Debian-trixie-arm64",
               kernel: "linux-image-arm64",
-              artifact: "debian-trixie-arm64",
               hostname: "debian-trixie-arm64",
               qcow2: "debian-trixie-arm64.qcow2",
               rootfs: "debian-trixie-arm64.tar.xz",
@@ -35,7 +34,8 @@ jobs:
             }
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Mount binfmt_misc
         run: |
@@ -75,40 +75,29 @@ jobs:
 
           sed -i 's/MODULES=most/MODULES=dep/' mnt/etc/initramfs-tools/initramfs.conf
 
-- name: Install kernel & initramfs config
-  run: |
-    echo 'fake /usr ext4 fake 0 1' > mnt/etc/fstab
-
-    chroot mnt apt update
-    chroot mnt apt install -y initramfs-tools
-
-    sed -i 's/MODULES=most/MODULES=dep/' mnt/etc/initramfs-tools/initramfs.conf
-
-    echo "virtio_mmio" >> mnt/etc/initramfs-tools/modules
-    echo "virtio_blk" >> mnt/etc/initramfs-tools/modules
-    echo "virtio_net" >> mnt/etc/initramfs-tools/modules
-    echo "virtio_pci" >> mnt/etc/initramfs-tools/modules
-    echo "ext4" >> mnt/etc/initramfs-tools/modules
-    echo "sd_mod" >> mnt/etc/initramfs-tools/modules
-    echo "xhci_pci" >> mnt/etc/initramfs-tools/modules
-    echo "uhci_hcd" >> mnt/etc/initramfs-tools/modules
-    echo "ehci_pci" >> mnt/etc/initramfs-tools/modules
-    echo "usb_storage" >> mnt/etc/initramfs-tools/modules
-    echo "uas" >> mnt/etc/initramfs-tools/modules
-    echo "usbhid" >> mnt/etc/initramfs-tools/modules
-    echo "usbnet" >> mnt/etc/initramfs-tools/modules
-    echo "ax88179_178a" >> mnt/etc/initramfs-tools/modules
-    echo "r8152" >> mnt/etc/initramfs-tools/modules
-    echo "cdc_ether" >> mnt/etc/initramfs-tools/modules
-    echo "kvm" >> mnt/etc/initramfs-tools/modules
-    echo "kvm_arm" >> mnt/etc/initramfs-tools/modules
-    echo "vhost_net" >> mnt/etc/initramfs-tools/modules
-    echo "vhost" >> mnt/etc/initramfs-tools/modules
-    echo "tun" >> mnt/etc/initramfs-tools/modules
-
-    chroot mnt apt install -y ${{ matrix.config.kernel }}
-
-    echo '/dev/vda / ext4 errors=remount-ro 0 1' > mnt/etc/fstab
+          cat <<'EOF' > mnt/etc/initramfs-tools/modules
+virtio_mmio
+virtio_blk
+virtio_net
+virtio_pci
+ext4
+sd_mod
+xhci_pci
+uhci_hcd
+ehci_pci
+usb_storage
+uas
+usbhid
+usbnet
+ax88179_178a
+r8152
+cdc_ether
+kvm
+kvm_arm
+vhost_net
+vhost
+tun
+EOF
 
           chroot mnt apt install -y ${{ matrix.config.kernel }}
 
@@ -135,7 +124,7 @@ jobs:
             libvirt-daemon-system \
             cpu-checker
 
-      - name: Configure SSH (full access)
+      - name: Configure SSH
         run: |
           cat > mnt/etc/ssh/sshd_config << 'EOF'
 Port 22
@@ -178,17 +167,17 @@ EOF
         run: |
           cat > mnt/etc/motd << 'EOF'
 
-  Debian Trixie ARM64 (Headless)
-  ==============================
+Debian Trixie ARM64 (Headless)
+==============================
 
-  Users:
-    root / root
-    debian / debian
+Users:
+  root / root
+  debian / debian
 
-  Features:
-    - SSH full access
-    - KVM enabled
-    - No GUI (lightweight)
+Features:
+  - SSH full access
+  - KVM enabled
+  - No GUI (lightweight)
 
 EOF
 
